@@ -253,7 +253,7 @@ class DeepSeekOCR(Model, SamplesMixin):
             self.tokenizer,
             prompt=self.prompt,
             image_file=sample.filepath,
-            output_path='',
+            output_path='temp_output',
             base_size=mode_params["base_size"],
             image_size=mode_params["image_size"],
             crop_mode=mode_params["crop_mode"],
