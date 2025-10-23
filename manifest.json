@@ -1,6 +1,6 @@
 {
     "name": "deepseek-ai/DeepSeek-OCR",
-    "url": "https://github.com/harpreetsahota204/kosmos2_5",
+    "url": "https://github.com/harpreetsahota204/deepseek_ocr",
     "models": [
         {
             "base_name": "deepseek-ai/DeepSeek-OCR",
