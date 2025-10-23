@@ -1,0 +1,29 @@
+{
+    "name": "deepseek-ai/DeepSeek-OCR",
+    "url": "https://github.com/harpreetsahota204/kosmos2_5",
+    "models": [
+        {
+            "base_name": "deepseek-ai/DeepSeek-OCR",
+            "base_filename":"DeepSeek_OCR",
+            "author": "DeepSeek",
+            "license": "MIT",
+            "source": "https://huggingface.co/deepseek-ai/DeepSeek-OCR",
+            "description": "DeepSeek-OCR is an open-source vision-language model (VLM) developed by DeepSeek to perform optical character recognition (OCR) and context compression for long and complex documents",
+            "tags": [
+                "detection",
+                "ocr",
+                "VLM"
+            ],
+            "date_added": "2025-10-23",
+            "requirements": {
+                "packages": ["huggingface-hub", "transformers==4.46.3", "tokenizers==0.20.3", "torch", "torchvision", "addict"],
+                "cpu": {
+                    "support": true
+                },
+                "gpu": {
+                    "support": true
+                }
+            }
+        }
+    ]
+}
