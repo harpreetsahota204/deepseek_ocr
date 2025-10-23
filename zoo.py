@@ -8,7 +8,7 @@ import numpy as np
 import torch
 
 import fiftyone as fo
-from fiftyone import Model
+from fiftyone import Model, SamplesMixin
 
 from transformers import AutoModel, AutoTokenizer
 from transformers.utils import is_flash_attn_2_available
@@ -50,7 +50,7 @@ def get_device():
     return "cpu"
 
 
-class DeepSeekOCR(Model):
+class DeepSeekOCR(Model, SamplesMixin):
     """FiftyOne model for DeepSeek-OCR vision-language tasks.
     
     Supports three operation modes:
@@ -80,6 +80,7 @@ class DeepSeekOCR(Model):
         torch_dtype: torch.dtype = None,
         **kwargs
     ):
+        SamplesMixin.__init__(self) 
         self.model_path = model_path
         self._resolution_mode = resolution_mode
         self._operation = operation
