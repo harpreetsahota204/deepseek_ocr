@@ -204,6 +204,20 @@ class DeepSeekOCR(Model, SamplesMixin):
         self._custom_prompt = value
         logger.info(f"Custom prompt set: {value}")
     
+    def _get_return_type(self):
+        """Determine return type based on operation or prompt content.
+        
+        When using a custom prompt, infers return type from prompt content:
+        - If prompt contains '<|grounding|>', returns 'detections'
+        - Otherwise, returns 'text'
+        
+        Returns:
+            str: "detections" or "text"
+        """
+        if self._custom_prompt:
+            return "detections" if "<|grounding|>" in self._custom_prompt else "text"
+        return OPERATIONS[self._operation]["return_type"]
+    
     def _to_detections(self, text: str) -> fo.Detections:
         """Parse DeepSeek-OCR grounding output to FiftyOne Detections.
         
@@ -280,8 +294,8 @@ class DeepSeekOCR(Model, SamplesMixin):
                 eval_mode=True
             )
         
-        # Parse output based on operation type
-        if OPERATIONS[self.operation]["return_type"] == "detections":
+        # Parse output based on return type
+        if self._get_return_type() == "detections":
             return self._to_detections(result)
         
         return result
