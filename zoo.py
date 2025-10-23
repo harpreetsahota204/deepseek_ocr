@@ -22,11 +22,17 @@ logger = logging.getLogger(__name__)
 
 @contextmanager
 def suppress_output():
-    """Suppress stdout, stderr, and warnings."""
+    """Suppress stdout, stderr, warnings, and transformers logging."""
     old_stdout = sys.stdout
     old_stderr = sys.stderr
     sys.stdout = io.StringIO()
     sys.stderr = io.StringIO()
+    
+    # Suppress transformers logging
+    transformers_logger = logging.getLogger("transformers")
+    old_transformers_level = transformers_logger.level
+    transformers_logger.setLevel(logging.ERROR)
+    
     try:
         with warnings.catch_warnings():
             warnings.simplefilter("ignore")
@@ -34,6 +40,7 @@ def suppress_output():
     finally:
         sys.stdout = old_stdout
         sys.stderr = old_stderr
+        transformers_logger.setLevel(old_transformers_level)
 
 # Resolution mode presets
 RESOLUTION_MODES = {
