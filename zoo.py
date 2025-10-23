@@ -124,13 +124,15 @@ class DeepSeekOCR(Model):
         
         model_kwargs = {
             "trust_remote_code": True,
-            "use_safetensors": True
+            "use_safetensors": True,
+            "torch_dtype": self.dtype,
+            "device_map": self.device
         }
         
         model_kwargs["_attn_implementation"] = "flash_attention_2" if is_flash_attn_2_available() else "eager"
         
         self.model = AutoModel.from_pretrained(model_path, **model_kwargs)
-        self.model = self.model.eval().to(self.device).to(self.dtype)
+        self.model = self.model.eval()
         
         logger.info("DeepSeek-OCR model loaded successfully")
     
