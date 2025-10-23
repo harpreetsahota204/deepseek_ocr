@@ -1,6 +1,9 @@
 import logging
 import re
 import ast
+import sys
+import io
+from contextlib import contextmanager
 from typing import Union
 
 from PIL import Image
@@ -14,6 +17,20 @@ from transformers import AutoModel, AutoTokenizer
 from transformers.utils import is_flash_attn_2_available
 
 logger = logging.getLogger(__name__)
+
+
+@contextmanager
+def suppress_output():
+    """Suppress stdout and stderr."""
+    old_stdout = sys.stdout
+    old_stderr = sys.stderr
+    sys.stdout = io.StringIO()
+    sys.stderr = io.StringIO()
+    try:
+        yield
+    finally:
+        sys.stdout = old_stdout
+        sys.stderr = old_stderr
 
 # Resolution mode presets
 RESOLUTION_MODES = {
@@ -248,19 +265,20 @@ class DeepSeekOCR(Model, SamplesMixin):
         # Get resolution parameters
         mode_params = RESOLUTION_MODES[self.resolution_mode]
         
-        # Run inference
-        result = self.model.infer(
-            self.tokenizer,
-            prompt=self.prompt,
-            image_file=sample.filepath,
-            output_path='temp_output',
-            base_size=mode_params["base_size"],
-            image_size=mode_params["image_size"],
-            crop_mode=mode_params["crop_mode"],
-            save_results=False,
-            test_compress=False,
-            eval_mode=True
-        )
+        # Run inference with suppressed output
+        with suppress_output():
+            result = self.model.infer(
+                self.tokenizer,
+                prompt=self.prompt,
+                image_file=sample.filepath,
+                output_path='temp',
+                base_size=mode_params["base_size"],
+                image_size=mode_params["image_size"],
+                crop_mode=mode_params["crop_mode"],
+                save_results=False,
+                test_compress=False,
+                eval_mode=True
+            )
         
         # Parse output based on operation type
         if OPERATIONS[self.operation]["return_type"] == "detections":
