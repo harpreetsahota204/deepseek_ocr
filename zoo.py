@@ -3,6 +3,7 @@ import re
 import ast
 import sys
 import io
+import warnings
 from contextlib import contextmanager
 from typing import Union
 
@@ -21,13 +22,15 @@ logger = logging.getLogger(__name__)
 
 @contextmanager
 def suppress_output():
-    """Suppress stdout and stderr."""
+    """Suppress stdout, stderr, and warnings."""
     old_stdout = sys.stdout
     old_stderr = sys.stderr
     sys.stdout = io.StringIO()
     sys.stderr = io.StringIO()
     try:
-        yield
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            yield
     finally:
         sys.stdout = old_stdout
         sys.stderr = old_stderr
