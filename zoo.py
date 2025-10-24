@@ -246,14 +246,25 @@ class DeepSeekOCR(Model, SamplesMixin):
         """
         detections = []
         
+        # Debug: Print first 1000 chars of output to see format
+        print("\n" + "="*80)
+        print("MODEL OUTPUT (first 1000 chars):")
+        print("="*80)
+        print(text[:1000])
+        print("="*80 + "\n")
+        
         # Pattern: <|ref|>label<|/ref|><|det|>[[x1, y1, x2, y2], ...]<|/det|>\ntext content
         pattern = r'<\|ref\|>(.*?)<\/\|ref\|><\|det\|>(\[\[.*?\]\])<\/\|det\|>\n(.*?)(?=\n<\|ref\||$)'
-        matches = re.finditer(pattern, text, re.DOTALL)
+        matches = list(re.finditer(pattern, text, re.DOTALL))
         
-        for match in matches:
+        print(f"Found {len(matches)} detection matches")
+        
+        for i, match in enumerate(matches):
             label = match.group(1).strip()
             coords_list = ast.literal_eval(match.group(2))
             text_content = match.group(3).strip()
+            
+            print(f"Match {i+1}: label='{label}', coords={coords_list}, text='{text_content[:50]}'")
             
             # Handle multiple boxes for same reference
             for coords in coords_list:
@@ -273,6 +284,7 @@ class DeepSeekOCR(Model, SamplesMixin):
                 
                 detections.append(detection)
         
+        print(f"Created {len(detections)} total detections\n")
         return fo.Detections(detections=detections)
     
     def _predict(self, image: Image.Image, sample) -> Union[fo.Detections, str]:
