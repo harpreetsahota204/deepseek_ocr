@@ -256,8 +256,6 @@ class DeepSeekOCR(Model, SamplesMixin):
             coords_list = ast.literal_eval(match.group(2))
             text_content = match.group(3).strip()
             
-            print(f"Match {i+1}: label='{label}', coords={coords_list}, text='{text_content[:50]}'")
-            
             # Handle multiple boxes for same reference
             for coords in coords_list:
                 x1, y1, x2, y2 = coords
