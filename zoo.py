@@ -253,8 +253,9 @@ class DeepSeekOCR(Model, SamplesMixin):
         print(text[:1000])
         print("="*80 + "\n")
         
-        # Pattern: <|ref|>label<|/ref|><|det|>[[x1, y1, x2, y2], ...]<|/det|>\ntext content
-        pattern = r'<\|ref\|>(.*?)<\/\|ref\|><\|det\|>(\[\[.*?\]\])<\/\|det\|>\n(.*?)(?=\n<\|ref\||$)'
+        # Pattern: <|ref|>label<|/ref|><|det|>[[x1, y1, x2, y2], ...]<|/det|>
+        # followed by optional whitespace and text content until next tag or end
+        pattern = r'<\|ref\|>(.*?)<\/\|ref\|><\|det\|>(\[\[.*?\]\])<\/\|det\|>\s*(.*?)(?=<\|ref\||$)'
         matches = list(re.finditer(pattern, text, re.DOTALL))
         
         print(f"Found {len(matches)} detection matches")
