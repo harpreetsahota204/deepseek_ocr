@@ -2,6 +2,8 @@
 
 DeepSeek-OCR is a vision-language model designed for optical character recognition with a focus on "contextual optical compression." Unlike traditional OCR engines, it uses a dual-encoder architecture (SAM + CLIP) to process documents and convert them to structured text formats like Markdown.
 
+![image](deepseekocr_fo.gif)
+
 **Key Features:**
 - Supports multiple resolution modes for different document types
 - Can process documents with complex layouts, tables, and formulas
@@ -19,6 +21,8 @@ pip install transformers==4.46.3
 pip install tokenizers==0.20.3
 pip install addict
 pip install fiftyone
+pip install torch
+pip install torchvision
 ```
 
 **Optional (for GPU acceleration):**
