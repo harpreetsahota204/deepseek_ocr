@@ -28,7 +28,7 @@ pip install einops
 
 **Optional (for GPU acceleration):**
 ```bash
-pip install flash-attn==2.7.3 --no-build-isolation
+pip install flash-attn --no-build-isolation
 ```
 
 ---
