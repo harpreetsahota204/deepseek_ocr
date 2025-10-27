@@ -23,6 +23,7 @@ pip install addict
 pip install fiftyone
 pip install torch
 pip install torchvision
+pip install einops
 ```
 
 **Optional (for GPU acceleration):**
