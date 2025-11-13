@@ -103,7 +103,7 @@ class DeepSeekOCRGetItem(GetItem):
 
 
 class DeepSeekOCR(Model, SupportsGetItem):
-    """FiftyOne model for DeepSeek-OCR vision-language tasks with batching support.
+    """FiftyOne model for DeepSeek-OCR vision-language tasks.
     
     Supports three operation modes:
     - grounding: Document to markdown with bounding boxes (returns fo.Detections)
@@ -115,23 +115,12 @@ class DeepSeekOCR(Model, SupportsGetItem):
     - float16 for older CUDA devices
     - float32 for CPU/MPS devices
     
-    Batching Performance:
-    - Parallel data loading with PyTorch DataLoader (multiple workers)
-    - Reduces I/O bottleneck by loading images in parallel
-    - 2-5x speedup compared to sequential processing
-    - Note: DeepSeek's infer() API processes images sequentially on GPU
-    
     Args:
         model_path: HuggingFace model ID or local path
         resolution_mode: One of "gundam", "base", "small", "large", "tiny" (default: "gundam")
         operation: Task type - "grounding", "ocr", "describe" (default: "grounding")
         custom_prompt: Custom prompt (overrides operation prompt)
         torch_dtype: Override automatic dtype selection
-    
-    Example:
-        >>> model = DeepSeekOCR(operation="grounding")
-        >>> dataset.apply_model(model, label_field="predictions")
-        >>> # Batching happens automatically!
     """
     
     def __init__(
@@ -360,10 +349,7 @@ class DeepSeekOCR(Model, SupportsGetItem):
         return self.build_get_item()
     
     def predict_all(self, batch, preprocess=None):
-        """Process a batch of samples using DeepSeek OCR.
-        
-        Note: DeepSeek's infer() method processes images sequentially via filepath,
-        but we still benefit from parallel data loading via DataLoader workers.
+        """Process a batch of samples.
         
         Args:
             batch: List of (image, filepath) tuples from GetItem
@@ -375,30 +361,35 @@ class DeepSeekOCR(Model, SupportsGetItem):
         if preprocess is None:
             preprocess = self._preprocess
         
-        # Extract images and filepaths from batch
-        items = []
-        for item in batch:
-            if isinstance(item, tuple):
-                img, filepath = item
-            else:
-                img = item
-                filepath = None
-            
-            # Convert to PIL Image if needed
-            if preprocess and isinstance(img, np.ndarray):
-                img = Image.fromarray(img)
-            
-            items.append((img, filepath))
+        # Handle preprocessing flag (convert format if needed)
+        if preprocess:
+            processed_batch = []
+            for item in batch:
+                if isinstance(item, tuple):
+                    img, filepath = item
+                else:
+                    img = item
+                    filepath = None
+                
+                if isinstance(img, np.ndarray):
+                    img = Image.fromarray(img)
+                processed_batch.append((img, filepath))
+            batch = processed_batch
         
-        # Get resolution parameters
+        # Process each image in the batch
+        # Note: DeepSeek-OCR model.infer() appears to be single-image only
+        # We still benefit from parallel data loading via DataLoader
+        results = []
         mode_params = RESOLUTION_MODES[self.resolution_mode]
         
-        # Process each image using DeepSeek's infer method
-        # This method requires a filepath, so we process sequentially
-        # but still benefit from parallel data loading from DataLoader
-        results = []
-        
-        for image, filepath in items:
+        for item in batch:
+            if isinstance(item, tuple):
+                image, filepath = item
+            else:
+                # Fallback if GetItem changes
+                image = item
+                filepath = None
+            
             # Run inference with suppressed output
             with suppress_output():
                 result = self.model.infer(
