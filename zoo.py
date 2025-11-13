@@ -360,7 +360,9 @@ class DeepSeekOCR(Model, SupportsGetItem):
         return self.build_get_item()
     
     def predict_all(self, batch, preprocess=None):
-        """Process a batch of samples using native DeepSeek batch inference.
+        """Process a batch of samples using DeepSeek OCR.
+        
+        Uses the transformers tokenizer API to prepare batched inputs for efficient processing.
         
         Args:
             batch: List of (image, filepath) tuples from GetItem
@@ -372,54 +374,74 @@ class DeepSeekOCR(Model, SupportsGetItem):
         if preprocess is None:
             preprocess = self._preprocess
         
-        # Extract images from batch
+        # Extract images and filepaths from batch
         images = []
+        filepaths = []
         for item in batch:
             if isinstance(item, tuple):
                 img, filepath = item
             else:
                 img = item
+                filepath = None
             
             # Convert to PIL Image if needed
             if preprocess and isinstance(img, np.ndarray):
                 img = Image.fromarray(img)
             
             images.append(img)
-        
-        # Prepare batched input for DeepSeek transformers API
-        # Format: List of dicts with prompt and multi_modal_data
-        model_inputs = []
-        for image in images:
-            model_inputs.append({
-                "prompt": self.prompt,
-                "multi_modal_data": {"image": image}
-            })
+            filepaths.append(filepath)
         
         # Get resolution parameters
         mode_params = RESOLUTION_MODES[self.resolution_mode]
         
+        # Prepare batched inputs using tokenizer
+        # Format conversations for DeepSeek chat template
+        conversations = []
+        for image in images:
+            conversations.append([{
+                "role": "user",
+                "content": self.prompt,
+                "images": [image]
+            }])
+        
         # Run batched inference with suppressed output
         with suppress_output():
-            # Prepare inputs for the model
-            inputs = self.model.prepare_inputs(
-                self.tokenizer,
-                model_inputs,
-                base_size=mode_params["base_size"],
-                image_size=mode_params["image_size"],
-                crop_mode=mode_params["crop_mode"]
+            # Apply chat template to get text prompts
+            text_prompts = [
+                self.tokenizer.apply_chat_template(
+                    conv,
+                    add_generation_prompt=True,
+                    tokenize=False
+                )
+                for conv in conversations
+            ]
+            
+            # Tokenize with images - this handles multimodal input preparation
+            inputs = self.tokenizer(
+                text=text_prompts,
+                images=[conv[0]["images"] for conv in conversations],
+                return_tensors="pt",
+                padding=True
             )
+            
+            # Move to device
+            inputs = {k: v.to(self.device) if isinstance(v, torch.Tensor) else v 
+                     for k, v in inputs.items()}
             
             # Generate outputs for the batch
-            outputs = self.model.generate(
-                **inputs,
-                tokenizer=self.tokenizer,
-                max_new_tokens=4096,
-                do_sample=False
-            )
+            with torch.no_grad():
+                outputs = self.model.generate(
+                    **inputs,
+                    max_new_tokens=4096,
+                    do_sample=False,
+                    pad_token_id=self.tokenizer.pad_token_id or self.tokenizer.eos_token_id
+                )
             
-            # Decode the outputs
+            # Decode the outputs (remove input tokens from output)
+            # Extract only the generated tokens (after input)
+            generated_tokens = outputs[:, inputs['input_ids'].shape[1]:]
             raw_results = self.tokenizer.batch_decode(
-                outputs,
+                generated_tokens,
                 skip_special_tokens=True,
                 clean_up_tokenization_spaces=False
             )
