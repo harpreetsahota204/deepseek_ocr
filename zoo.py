@@ -12,9 +12,7 @@ import numpy as np
 import torch
 
 import fiftyone as fo
-from fiftyone import Model
-from fiftyone.core.models import SupportsGetItem
-from fiftyone.utils.torch import GetItem
+from fiftyone import Model, SamplesMixin
 
 from transformers import AutoModel, AutoTokenizer
 from transformers.utils import is_flash_attn_2_available
@@ -79,30 +77,7 @@ def get_device():
     return "cpu"
 
 
-class DeepSeekOCRGetItem(GetItem):
-    """GetItem transform for loading images for DeepSeek-OCR batching."""
-    
-    @property
-    def required_keys(self):
-        """Fields required from each sample."""
-        return ["filepath"]
-    
-    def __call__(self, sample_dict):
-        """Load and return PIL Image.
-        
-        Args:
-            sample_dict: Dictionary with sample data including filepath
-        
-        Returns:
-            Tuple of (PIL Image, filepath) - filepath needed for DeepSeek inference
-        """
-        filepath = sample_dict["filepath"]
-        image = Image.open(filepath).convert("RGB")
-        # Return both image and filepath since DeepSeek's infer() needs the filepath
-        return (image, filepath)
-
-
-class DeepSeekOCR(Model, SupportsGetItem):
+class DeepSeekOCR(Model, SamplesMixin):
     """FiftyOne model for DeepSeek-OCR vision-language tasks.
     
     Supports three operation modes:
@@ -132,8 +107,7 @@ class DeepSeekOCR(Model, SupportsGetItem):
         torch_dtype: torch.dtype = None,
         **kwargs
     ):
-        SupportsGetItem.__init__(self)
-        self._preprocess = False  # GetItem handles data loading
+        SamplesMixin.__init__(self) 
         self.model_path = model_path
         self._resolution_mode = resolution_mode
         self._operation = operation
@@ -240,37 +214,6 @@ class DeepSeekOCR(Model, SupportsGetItem):
         self._custom_prompt = value
         logger.info(f"Custom prompt set: {value}")
     
-    @property
-    def preprocess(self):
-        """Whether preprocessing should be applied.
-        
-        For SupportsGetItem, this is False since GetItem handles data loading.
-        """
-        return self._preprocess
-    
-    @preprocess.setter
-    def preprocess(self, value):
-        """Set preprocessing flag."""
-        self._preprocess = value
-    
-    @property
-    def has_collate_fn(self):
-        """Whether this model provides a custom collate function."""
-        return False
-    
-    @property
-    def collate_fn(self):
-        """Custom collate function for the DataLoader."""
-        return None
-    
-    @property
-    def ragged_batches(self):
-        """Whether this model supports batches with varying sizes.
-        
-        Returns True since images can have different dimensions.
-        """
-        return True
-    
     def _get_return_type(self):
         """Determine return type based on operation or prompt content.
         
@@ -332,86 +275,6 @@ class DeepSeekOCR(Model, SupportsGetItem):
                 detections.append(detection)
         
         return fo.Detections(detections=detections)
-    
-    def build_get_item(self, field_mapping=None):
-        """Build GetItem transform for data loading.
-        
-        Args:
-            field_mapping: Optional dict mapping required_keys to dataset fields
-        
-        Returns:
-            DeepSeekOCRGetItem instance
-        """
-        return DeepSeekOCRGetItem(field_mapping=field_mapping)
-    
-    def get_item(self):
-        """Convenience wrapper for build_get_item()."""
-        return self.build_get_item()
-    
-    def predict_all(self, batch, preprocess=None):
-        """Process a batch of samples.
-        
-        Args:
-            batch: List of (image, filepath) tuples from GetItem
-            preprocess: Whether to apply preprocessing (if None, uses self.preprocess)
-        
-        Returns:
-            List of predictions (one per image) - fo.Detections or str based on operation
-        """
-        if preprocess is None:
-            preprocess = self._preprocess
-        
-        # Handle preprocessing flag (convert format if needed)
-        if preprocess:
-            processed_batch = []
-            for item in batch:
-                if isinstance(item, tuple):
-                    img, filepath = item
-                else:
-                    img = item
-                    filepath = None
-                
-                if isinstance(img, np.ndarray):
-                    img = Image.fromarray(img)
-                processed_batch.append((img, filepath))
-            batch = processed_batch
-        
-        # Process each image in the batch
-        # Note: DeepSeek-OCR model.infer() appears to be single-image only
-        # We still benefit from parallel data loading via DataLoader
-        results = []
-        mode_params = RESOLUTION_MODES[self.resolution_mode]
-        
-        for item in batch:
-            if isinstance(item, tuple):
-                image, filepath = item
-            else:
-                # Fallback if GetItem changes
-                image = item
-                filepath = None
-            
-            # Run inference with suppressed output
-            with suppress_output():
-                result = self.model.infer(
-                    self.tokenizer,
-                    prompt=self.prompt,
-                    image_file=filepath,
-                    output_path='temp',
-                    base_size=mode_params["base_size"],
-                    image_size=mode_params["image_size"],
-                    crop_mode=mode_params["crop_mode"],
-                    save_results=False,
-                    test_compress=False,
-                    eval_mode=True
-                )
-            
-            # Parse output based on return type
-            if self._get_return_type() == "detections":
-                results.append(self._to_detections(result))
-            else:
-                results.append(result)
-        
-        return results
     
     def _predict(self, image: Image.Image, sample) -> Union[fo.Detections, str]:
         """Process image through DeepSeek-OCR.
